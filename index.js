@@ -16,8 +16,8 @@ const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
 // 2. الحسابات وملف السجل
 const tiktokAccounts = [
-    'https://www.tiktok.com/@account_1', // ضع حساباتك هنا
-    'https://www.tiktok.com/@account_2'
+    'https://www.tiktok.com/@films2026_', // ضع حساباتك هنا
+    'https://www.tiktok.com/@sekaleahmed'
 ];
 const DB_FILE = 'history.json';
 
