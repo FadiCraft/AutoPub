@@ -2,98 +2,97 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const { google } = require('googleapis');
 
-// 1. معلومات يوتيوب التجريبية (كما طلبت)
+// --- 1. إعدادات اليوتيوب (استخدام معلوماتك التجريبية) ---
 const YOUTUBE_CONFIG = {
   clientId: "80097892689-fatsck4rfg2n7g66ma33fm9jp24a3fes.apps.googleusercontent.com",
   clientSecret: "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",
-  refreshToken: "1//04OySrfdvka32CgYIARAAGAQSNwF-L9IrDkZiwdv-6X0c9RfppP38Ngo-Rt0EW5TvZiNTJu3LvbI4VSIx_9NmS-DCaVVskB8yIhM"
+  refreshToken: "1//0402McOnnSfYTCgYIARAAGAQSNwF-L9IrHIeF6t-siXlEk4OREx_1gtOf8_8qEdHq3kDNHMnWpOMWyomF6FndgZvgiFwGYMyAwd4"
 };
 
-// تهيئة اتصال يوتيوب
 const oauth2Client = new google.auth.OAuth2(YOUTUBE_CONFIG.clientId, YOUTUBE_CONFIG.clientSecret);
 oauth2Client.setCredentials({ refresh_token: YOUTUBE_CONFIG.refreshToken });
 const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-// 2. الحسابات وملف السجل
+// --- 2. الإعدادات العامة ---
 const tiktokAccounts = [
     'https://www.tiktok.com/@films2026_', // ضع حساباتك هنا
     'https://www.tiktok.com/@sekaleahmed'
 ];
 const DB_FILE = 'history.json';
+const MY_SITE = "https://redirectauto4kiro.blogspot.com/";
 
-async function runKiroBot() {
-    // جلب السجل الحالي
+async function runKiroAutomation() {
     let publishedVideos = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE)) : [];
-
-    // اختيار حساب عشوائي في كل تشغيلة
     const randomAccount = tiktokAccounts[Math.floor(Math.random() * tiktokAccounts.length)];
-    console.log(`تم اختيار الحساب العشوائي: ${randomAccount}`);
-
+    
     try {
-        // 3. جلب كل الفيديوهات في الحساب (yt-dlp يجلبها تلقائياً من الأحدث للأقدم)
-        console.log("جاري فحص قائمة الفيديوهات بالتسلسل...");
-        // شلنا الـ limit عشان يفحص الحساب كامل إذا لزم الأمر
-        const output = execSync(`yt-dlp --get-id "${randomAccount}"`, { encoding: 'utf-8', maxBuffer: 1024 * 1024 * 10 });
+        console.log(`فحص الحساب: ${randomAccount}`);
+        const output = execSync(`yt-dlp --get-id --playlist-items 20 "${randomAccount}"`, { encoding: 'utf-8' });
         const videoIds = output.trim().split('\n').filter(id => id.length > 0);
 
         let videoToUpload = null;
-
-        // 4. الفحص التسلسلي الدقيق (من الأحدث للذي قبله للذي قبله...)
         for (const id of videoIds) {
-            if (!publishedVideos.includes(id)) {
-                videoToUpload = id;
-                break; // بمجرد إيجاد أول فيديو غير منشور، يتوقف البحث فوراً
-            }
+            if (!publishedVideos.includes(id)) { videoToUpload = id; break; }
         }
 
-        // 5. حالة: كل الفيديوهات منشورة
         if (!videoToUpload) {
-            console.log("العملية ناجحة: جميع فيديوهات هذا الحساب تم نشرها مسبقاً. لا يوجد شيء جديد لنشره.");
-            return; // إنهاء السكربت بسلام
+            console.log("الكل منشور. شكراً لك.");
+            return;
         }
 
-        console.log(`تم العثور على فيديو غير منشور: ${videoToUpload}`);
-        console.log("جاري التحميل...");
+        // تحميل ومعالجة الفيديو (زوم 125% لتغيير البصمة)
+        console.log("تحميل ومعالجة الفيديو...");
         execSync(`yt-dlp -f "best" -o "input.mp4" "https://www.tiktok.com/@any/video/${videoToUpload}"`);
+        execSync(`ffmpeg -i input.mp4 -vf "scale=iw*1.25:ih*1.25,crop=iw/1.25:ih/1.25" -c:v libx264 -crf 20 -y output.mp4`);
 
-        // 6. المعالجة بـ FFmpeg (معالجة البصمة وتطبيق زوم 125%)
-        console.log("جاري معالجة الفيديو بـ FFmpeg...");
-        execSync(`ffmpeg -i input.mp4 -vf "scale=iw*1.25:ih*1.25,crop=iw/1.25:ih/1.25" -c:v libx264 -crf 20 -c:a aac -y output.mp4`);
+        // --- 3. تجهيز الوصف والكلمات المفتاحية بشكل غير مباشر ---
+        const videoTitle = "أقوى لقطات الأفلام والمسلسلات الحصرية 🎬 #Shorts";
+        const videoDescription = `استمتع بمشاهدة أفضل مقتطفات السينما العالمية. 🍿\n\nإذا كنت تبحث عن تجربة مشاهدة فريدة ومعلومات إضافية عن هذه الأعمال، فقد وضعنا لكم دليلاً كاملاً في الرابط الموجود في أول تعليق مثبت أسفل الفيديو. 👇\n\n#أفلام #مسلسلات #Shorts #Movies #Kiro_Cinema`;
 
-        // 7. الرفع المباشر ليوتيوب
-        console.log("جاري النشر على يوتيوب مباشرة...");
-        const res = await youtube.videos.insert({
+        // --- 4. النشر على يوتيوب ---
+        console.log("نشر الفيديو...");
+        const videoRes = await youtube.videos.insert({
             part: 'snippet,status',
             requestBody: {
                 snippet: {
-                    title: 'فيديو حصري جديد 🔥 #Shorts', // العنوان
-                    description: 'أفضل المقاطع اليومية، لا تنسى الاشتراك! #ترند #تيك_توك #Shorts', // الوصف
-                    tags: ['Shorts', 'Trend', 'TikTok', 'فيديو'], // الكلمات المفتاحية
-                    categoryId: '22'
+                    title: videoTitle,
+                    description: videoDescription,
+                    tags: ['أفلام', 'مسلسلات', 'Movies', 'Cinema', 'Shorts'],
+                    categoryId: '24' // Entertainment
                 },
-                status: {
-                    privacyStatus: 'public', // ينشر للعلن مباشرة
-                    selfDeclaredMadeForKids: false
-                }
+                status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
             },
-            media: {
-                body: fs.createReadStream('output.mp4')
+            media: { body: fs.createReadStream('output.mp4') }
+        });
+
+        const newVideoId = videoRes.data.id;
+        console.log(`تم النشر! ID: ${newVideoId}`);
+
+        // --- 5. إضافة التعليق المثبت المقنع ---
+        console.log("إضافة التعليق المثبت...");
+        await youtube.commentThreads.insert({
+            part: 'snippet',
+            requestBody: {
+                snippet: {
+                    videoId: newVideoId,
+                    topLevelComment: {
+                        snippet: {
+                            textDisplay: `هل تبحث عن الفيلم الكامل أو المزيد من التوصيات؟ شاهد القائمة الكاملة والحصرية من هنا: ${MY_SITE} ✨🍿`
+                        }
+                    }
+                }
             }
         });
 
-        console.log(`تم النشر بنجاح! الرابط: https://youtu.be/${res.data.id}`);
-
-        // 8. تسجيل الفيديو في القاعدة حتى لا يتكرر
+        // تحديث السجل
         publishedVideos.push(videoToUpload);
         fs.writeFileSync(DB_FILE, JSON.stringify(publishedVideos, null, 2));
 
-        // تنظيف الملفات
-        if (fs.existsSync('input.mp4')) fs.unlinkSync('input.mp4');
-        if (fs.existsSync('output.mp4')) fs.unlinkSync('output.mp4');
+        console.log("تمت العملية بنجاح كامل.");
 
     } catch (error) {
-        console.error("حدث خطأ أثناء التنفيذ:", error.message);
+        console.error("فشل السكربت:", error.message);
     }
 }
 
-runKiroBot();
+runKiroAutomation();
