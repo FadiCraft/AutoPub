@@ -1,33 +1,43 @@
-name: Test TikTok Download & Process
+name: Kiro Auto Bot - TikTok to YouTube
 
 on:
-  workflow_dispatch: # تشغيل يدوي بضغطة زر
+  schedule:
+    - cron: '0 * * * *' # يعمل كل ساعة بشكل تلقائي
+  workflow_dispatch: # يتيح لك تشغيل السكربت يدوياً بضغطة زر للتجربة
 
 jobs:
-  test_run:
+  run-automation:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # إذن ضروري لتحديث ملف history.json في المستودع
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-    - name: Install yt-dlp & FFmpeg
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg
-        sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-        sudo chmod a+rx /usr/local/bin/yt-dlp
+      - name: Install System Tools (FFmpeg & yt-dlp)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+          sudo chmod a+rx /usr/local/bin/yt-dlp
 
-    - name: Run Test Script
-      run: node index.js
+      - name: Install Node Modules
+        run: npm install googleapis
 
-    - name: Upload Processed Video
-      uses: actions/upload-artifact@v4
-      with:
-        name: my-processed-video
-        path: processed_video.mp4
+      - name: Run Kiro Bot
+        run: node index.js
+
+      - name: Save and Push History
+        run: |
+          git config --global user.name "Kiro Bot"
+          git config --global user.email "bot@kirozozo.com"
+          git add history.json
+          # [skip ci] تمنع GitHub من إعادة تشغيل نفسه في حلقة مفرغة بعد هذا التحديث
+          git commit -m "Update history.json [skip ci]" || echo "لا يوجد تحديثات جديدة على السجل"
+          git push
