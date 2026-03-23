@@ -10,8 +10,7 @@ const YOUTUBE_CONFIG = {
 };
 
 const MY_SITE = "كيرو زوزو ";
-const DB_FILE = 'history.json';
-const PROCESSED_FILE = 'processed_videos.json'; // ملف منفصل للفيديوهات المعالجة
+const DB_FILE = 'published_history.json'; // ملف لتسجيل الفيديوهات المنشورة
 
 const tiktokAccounts = [
     'https://www.tiktok.com/@films2026_',
@@ -99,53 +98,62 @@ async function postComment(videoId, text) {
     }
 }
 
-// --- دالة جديدة لجلب جميع فيديوهات التيك توك ---
-async function getAllTikTokVideos(accountUrl) {
-    console.log(`📋 جلب جميع فيديوهات التيك توك من: ${accountUrl}`);
+// --- دالة لجلب فيديو واحد جديد فقط (الأقدم أو الأحدث حسب الرغبة) ---
+async function getNextVideoToPublish(accountUrl, publishedVideos) {
+    console.log(`📋 جلب الفيديوهات من: ${accountUrl}`);
     
     try {
         // جلب جميع معرفات الفيديوهات من الحساب
         const idsOutput = execSync(`yt-dlp --get-id --flat-playlist "${accountUrl}"`, { 
             encoding: 'utf-8',
-            maxBuffer: 10 * 1024 * 1024 // زيادة البفر لاستيعاب عدد كبير من الفيديوهات
+            maxBuffer: 10 * 1024 * 1024
         });
         
-        const videoIds = idsOutput.trim().split('\n').filter(id => id.length > 0);
+        let videoIds = idsOutput.trim().split('\n').filter(id => id.length > 0);
         console.log(`✅ تم العثور على ${videoIds.length} فيديو في الحساب`);
         
-        // ترتيب الفيديوهات من الأقدم إلى الأحدث (أو العكس حسب رغبتك)
-        // هنا سنعكس الترتيب ليكون من الأقدم للأحدث
-        const orderedVideos = videoIds.reverse();
+        // تصفية الفيديوهات التي لم تنشر بعد
+        const newVideos = videoIds.filter(id => !publishedVideos.includes(id));
+        console.log(`📊 فيديوهات جديدة غير منشورة: ${newVideos.length}`);
         
-        return orderedVideos;
+        if (newVideos.length === 0) {
+            return null;
+        }
+        
+        // اختيار الفيديو الأقدم أولاً (عكس الترتيب)
+        // لو حبيت تنشر الأحدث أولاً، امسح الـ reverse()
+        const oldestFirst = newVideos.reverse();
+        
+        console.log(`🎯 سيتم نشر الفيديو: ${oldestFirst[0]}`);
+        return oldestFirst[0];
+        
     } catch (error) {
         console.error(`❌ خطأ في جلب فيديوهات التيك توك: ${error.message}`);
-        return [];
+        return null;
     }
 }
 
 // --- دالة لتحميل ونشر فيديو واحد ---
-async function processVideo(videoId, accountIndex, videoIndex, totalVideos) {
-    console.log(`\n📹 [${videoIndex + 1}/${totalVideos}] بدء معالجة الفيديو: ${videoId}`);
+async function publishSingleVideo(videoId, accountUrl) {
+    console.log(`\n📹 بدء معالجة الفيديو: ${videoId}`);
     
     let title = "مشهد رائع من كيرو زوزو 🔥";
     try {
         title = execSync(`yt-dlp --get-title "https://www.tiktok.com/@any/video/${videoId}"`, { 
             encoding: 'utf-8' 
         }).trim().replace(/#\w+/g, '');
+        console.log(`🎬 عنوان الفيديو: ${title.substring(0, 50)}...`);
     } catch(e) {
         console.log(`⚠️ تعذر جلب العنوان، سيتم استخدام العنوان الافتراضي`);
     }
     
-    console.log(`🎬 عنوان الفيديو: ${title.substring(0, 50)}...`);
-    
     // تحميل الفيديو
     console.log("⬇️ جاري التحميل...");
-    execSync(`yt-dlp -f "bestvideo[height<=1080]+bestaudio/best" -o "input_${videoId}.mp4" "https://www.tiktok.com/@any/video/${videoId}"`);
+    execSync(`yt-dlp -f "bestvideo[height<=1080]+bestaudio/best" -o "input.mp4" "https://www.tiktok.com/@any/video/${videoId}"`);
     
     // معالجة احترافية
-    console.log("🛠️ جاري المعالجة...");
-    execSync(`ffmpeg -i input_${videoId}.mp4 -vf "scale=iw*1.25:ih*1.25,crop=iw/1.25:ih/1.25,eq=brightness=0.01:contrast=1.03" -map_metadata -1 -c:v libx264 -crf 23 -c:a aac -y output_${videoId}.mp4`);
+    console.log("🛠️ جاري المعالجة بالفلاتر...");
+    execSync(`ffmpeg -i input.mp4 -vf "scale=iw*1.25:ih*1.25,crop=iw/1.25:ih/1.25,eq=brightness=0.01:contrast=1.03" -map_metadata -1 -c:v libx264 -crf 23 -c:a aac -y output.mp4`);
     
     // رفع الفيديو
     console.log("📤 جاري الرفع إلى اليوتيوب...");
@@ -160,15 +168,15 @@ async function processVideo(videoId, accountIndex, videoIndex, totalVideos) {
             },
             status: { privacyStatus: 'public' }
         },
-        media: { body: fs.createReadStream(`output_${videoId}.mp4`) }
+        media: { body: fs.createReadStream('output.mp4') }
     });
     
     const newYtId = uploadRes.data.id;
     console.log(`✅ تم النشر بنجاح: https://youtu.be/${newYtId}`);
     
-    // إضافة التعليق
-    console.log("⏳ انتظار 60 ثوانٍ قبل إضافة التعليق...");
-    await delay(60000);
+    // إضافة التعليق بعد 60 ثانية
+    console.log("⏳ انتظار 120 ثانية قبل إضافة التعليق...");
+    await delay(120000);
     
     const proComment = `لمزيد من المحتوى زورونا على  ${MY_SITE}\n\n` +
                        `🔥 تابعوا كيرو زوزو - kirozozo للمزيد من المتعة!\n` +
@@ -177,94 +185,141 @@ async function processVideo(videoId, accountIndex, videoIndex, totalVideos) {
     await postComment(newYtId, proComment);
     
     // تنظيف الملفات المؤقتة
-    [`input_${videoId}.mp4`, `output_${videoId}.mp4`].forEach(f => { 
+    ['input.mp4', 'output.mp4'].forEach(f => { 
         if(fs.existsSync(f)) fs.unlinkSync(f); 
     });
     
-    return { videoId, published: true, youtubeId: newYtId, title };
+    return { 
+        success: true, 
+        videoId: videoId, 
+        youtubeId: newYtId, 
+        title: title,
+        account: accountUrl,
+        publishedAt: new Date().toISOString()
+    };
 }
 
-// --- المحرك الرئيسي المحسن ---
+// --- المحرك الرئيسي (ينشر فيديو واحد فقط في كل مرة) ---
 async function startKiroSystem() {
-    // قراءة قائمة الفيديوهات المنشورة سابقاً
-    let publishedVideos = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE)) : [];
-    let processedVideos = fs.existsSync(PROCESSED_FILE) ? JSON.parse(fs.readFileSync(PROCESSED_FILE)) : [];
+    console.log("🚀 بدء تشغيل نظام نشر الفيديوهات (فيديو واحد لكل تشغيلة)");
+    console.log("=" .repeat(50));
     
-    console.log(`📊 تم نشر ${publishedVideos.length} فيديو مسبقاً`);
+    // قراءة تاريخ الفيديوهات المنشورة
+    let publishedVideos = [];
+    let fullHistory = [];
     
-    // المعالجة لكل حساب تيك توك
-    for (let accIndex = 0; accIndex < tiktokAccounts.length; accIndex++) {
-        const account = tiktokAccounts[accIndex];
-        console.log(`\n🚀 بدء العمل على حساب تيك توك ${accIndex + 1}/${tiktokAccounts.length}: ${account}`);
-        
-        // جلب جميع فيديوهات التيك توك
-        const allVideos = await getAllTikTokVideos(account);
-        
-        if (allVideos.length === 0) {
-            console.log(`⚠️ لا توجد فيديوهات في هذا الحساب`);
-            continue;
-        }
-        
-        // تصفية الفيديوهات التي لم تنشر بعد
-        const newVideos = allVideos.filter(videoId => !publishedVideos.includes(videoId));
-        
-        console.log(`📊 فيديوهات جديدة للنشر: ${newVideos.length} من أصل ${allVideos.length}`);
-        
-        if (newVideos.length === 0) {
-            console.log(`✅ جميع فيديوهات هذا الحساب تم نشرها مسبقاً`);
-            continue;
-        }
-        
-        // نشر جميع الفيديوهات الجديدة بالترتيب
-        for (let i = 0; i < newVideos.length; i++) {
-            const videoId = newVideos[i];
-            
-            try {
-                // نشر الفيديو
-                const result = await processVideo(videoId, accIndex, i, newVideos.length);
-                
-                if (result.published) {
-                    // تحديث قائمة الفيديوهات المنشورة
-                    publishedVideos.push(videoId);
-                    fs.writeFileSync(DB_FILE, JSON.stringify(publishedVideos, null, 2));
-                    
-                    // حفظ تفاصيل المعالجة
-                    processedVideos.push({
-                        ...result,
-                        account: account,
-                        publishedAt: new Date().toISOString()
-                    });
-                    fs.writeFileSync(PROCESSED_FILE, JSON.stringify(processedVideos, null, 2));
-                    
-                    console.log(`✅ [${i + 1}/${newVideos.length}] تم نشر الفيديو بنجاح`);
-                    
-                    // فحص حالة الفيديو السابق بعد كل نشر
-                    await checkPreviousVideoStatus();
-                    
-                    // انتظار بين الفيديوهات لتجنب مشاكل الـ API
-                    if (i < newVideos.length - 1) {
-                        console.log(`⏳ انتظار 5 دقائق قبل نشر الفيديو التالي...`);
-                        await delay(300000); // 5 دقائق بين كل فيديو وآخر
-                    }
-                }
-                
-            } catch (error) {
-                console.error(`❌ فشل نشر الفيديو ${videoId}: ${error.message}`);
-                // في حالة الفشل، انتظر قبل المحاولة التالية
-                await delay(60000);
-                continue;
+    if (fs.existsSync(DB_FILE)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+            if (Array.isArray(data)) {
+                // إذا كان الملف عبارة عن مصفوفة بسيطة (للتوافق مع القديم)
+                publishedVideos = data;
+                fullHistory = data.map(id => ({ videoId: id }));
+            } else if (data.publishedVideos) {
+                // إذا كان الملف يحتوي على هيكل متقدم
+                publishedVideos = data.publishedVideos || [];
+                fullHistory = data.history || [];
             }
+            console.log(`📊 تم استعادة سجل النشر: ${publishedVideos.length} فيديو منشور سابقاً`);
+        } catch(e) {
+            console.log("⚠️ خطأ في قراءة ملف السجل، سيتم البدء من جديد");
+            publishedVideos = [];
         }
+    } else {
+        console.log("📝 لا يوجد سجل سابق، سيتم البدء من البداية");
+    }
+    
+    // البحث عن فيديو جديد من حسابات التيك توك
+    let selectedVideoId = null;
+    let selectedAccount = null;
+    
+    // محاولة جلب فيديو جديد من كل حساب بالترتيب
+    for (const account of tiktokAccounts) {
+        console.log(`\n🔍 البحث في حساب: ${account}`);
+        const nextVideo = await getNextVideoToPublish(account, publishedVideos);
         
-        // انتظار بين الحسابات المختلفة
-        if (accIndex < tiktokAccounts.length - 1) {
-            console.log(`\n⏳ انتظار 10 دقائق قبل الانتقال للحساب التالي...`);
-            await delay(600000);
+        if (nextVideo) {
+            selectedVideoId = nextVideo;
+            selectedAccount = account;
+            console.log(`✅ تم العثور على فيديو جديد للنشر: ${nextVideo}`);
+            break;
+        } else {
+            console.log(`ℹ️ لا توجد فيديوهات جديدة للنشر في هذا الحساب`);
         }
     }
     
-    console.log(`\n🎉 اكتملت عملية نشر جميع الفيديوهات بنجاح!`);
-    console.log(`📊 ملخص النشر: ${publishedVideos.length} فيديو منشور في المجمل`);
+    // إذا لم نجد أي فيديو جديد
+    if (!selectedVideoId) {
+        console.log("\n🎉 مبروك! تم نشر جميع الفيديوهات من جميع الحسابات!");
+        console.log(`📊 إجمالي الفيديوهات المنشورة: ${publishedVideos.length}`);
+        
+        // عرض آخر 5 فيديوهات منشورة
+        if (fullHistory.length > 0) {
+            console.log("\n📋 آخر 5 فيديوهات تم نشرها:");
+            const last5 = fullHistory.slice(-5);
+            last5.forEach((item, index) => {
+                console.log(`   ${index + 1}. ${item.videoId} - ${item.title || 'بدون عنوان'}`);
+            });
+        }
+        return;
+    }
+    
+    // نشر الفيديو الجديد
+    console.log("\n📤 بدء عملية النشر...");
+    console.log(`🎯 الفيديو المختار: ${selectedVideoId}`);
+    console.log(`📱 من حساب: ${selectedAccount}`);
+    
+    try {
+        const result = await publishSingleVideo(selectedVideoId, selectedAccount);
+        
+        if (result.success) {
+            // تحديث سجل النشر
+            publishedVideos.push(selectedVideoId);
+            
+            // حفظ السجل بشكل متقدم
+            const historyData = {
+                publishedVideos: publishedVideos,
+                lastPublished: new Date().toISOString(),
+                totalPublished: publishedVideos.length,
+                history: [
+                    ...(fullHistory),
+                    {
+                        videoId: selectedVideoId,
+                        youtubeId: result.youtubeId,
+                        title: result.title,
+                        account: selectedAccount,
+                        publishedAt: result.publishedAt
+                    }
+                ]
+            };
+            
+            fs.writeFileSync(DB_FILE, JSON.stringify(historyData, null, 2));
+            console.log("\n✅ تم حفظ السجل بنجاح!");
+            
+            // فحص الفيديو السابق
+            await checkPreviousVideoStatus();
+            
+            // عرض إحصائيات
+            console.log("\n📊 إحصائيات النشر:");
+            console.log(`   ✅ الفيديو المنشور: ${selectedVideoId}`);
+            console.log(`   🔗 رابط اليوتيوب: https://youtu.be/${result.youtubeId}`);
+            console.log(`   📅 تاريخ النشر: ${result.publishedAt}`);
+            console.log(`   📈 إجمالي المنشورات: ${publishedVideos.length}`);
+            
+        } else {
+            console.log("❌ فشل نشر الفيديو");
+        }
+        
+    } catch (error) {
+        console.error("❌ خطأ أثناء عملية النشر:", error.message);
+        
+        // تنظيف الملفات المؤقتة في حالة الخطأ
+        ['input.mp4', 'output.mp4'].forEach(f => { 
+            if(fs.existsSync(f)) fs.unlinkSync(f); 
+        });
+    }
+    
+    console.log("\n🏁 انتهت عملية النشر (فيديو واحد)");
 }
 
 // تشغيل النظام
