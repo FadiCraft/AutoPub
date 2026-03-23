@@ -9,7 +9,7 @@ const YOUTUBE_CONFIG = {
     refreshToken: "1//04OySrfdvka32CgYIARAAGAQSNwF-L9IrDkZiwdv-6X0c9RfppP38Ngo-Rt0EW5TvZiNTJu3LvbI4VSIx_9NmS-DCaVVskB8yIhM"
 };
 
-const MY_SITE = "https://redirectauto4kiro.blogspot.com/";
+const MY_SITE = "كيرو زوزو ";
 const DB_FILE = 'history.json';
 
 const tiktokAccounts = [
@@ -72,8 +72,8 @@ async function checkPreviousVideoStatus() {
 function buildProDescription(title) {
     return `🎬 كيرو زوزو | KiroZozo - عالم الأفلام والمسلسلات\n` +
            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-           `📍 لمشاهدة الفيلم كامل أو التحميل بجودة عالية، تفضل بزيارة موقعنا الرسمي:\n` +
-           `🔗 رابط الموقع: ${MY_SITE}\n` +
+           `💡 للمزيد من التفاصيل:\n` +
+           `🔍 ابحث في جوجل: ${MY_SITE}\n` +
            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
            `✨ نبذة عن هذا المقطع:\n` +
            `${title || "لقطة مميزة مختارة لكم بعناية"}\n\n` +
@@ -153,10 +153,10 @@ async function startKiroSystem() {
             await checkPreviousVideoStatus();
 
             // إضافة التعليق على الفيديو الحالي
-            console.log("⏳ انتظار 10 ثوانٍ للتعليق...");
-            await delay(10000);
+            console.log("⏳ انتظار 60 ثوانٍ للتعليق...");
+            await delay(60000);
             
-            const proComment = `🍿 شاهد الفيلم كامل أو حمله بجودة عالية من هنا: ${MY_SITE}\n\n` +
+            const proComment = `لمزيد من المحتوى زورونا على  ${MY_SITE}\n\n` +
                                `🔥 تابعوا كيرو زوزو - kirozozo للمزيد من المتعة!\n` +
                                `✨ لا تنسوا اللايك والاشتراك يا أساطير ❤️`;
             
