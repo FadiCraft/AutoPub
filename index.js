@@ -91,8 +91,8 @@ async function startProfessionalAutomation() {
                 fs.writeFileSync(CONFIG.dbFile, JSON.stringify(history, null, 2));
 
                 // 6. إضافة التعليق بعد انتظار 3 دقائق (اختياري للحماية)
-                console.log("⏳ انتظار 3 دقائق للتعليق...");
-                await delay(180000);
+                console.log("⏳ انتظار 1 دقائق للتعليق...");
+                await delay(60000);
                 await youtube.commentThreads.insert({
                     part: 'snippet',
                     requestBody: {
