@@ -2,7 +2,7 @@ name: Kiro Auto Bot - TikTok to YouTube
 
 on:
   schedule:
-    - cron: '0 * * * *' # يعمل كل ساعة بشكل تلقائي
+    - cron: '0 */5 * * *' # يعمل 4 مرات في اليوم (كل 5 ساعات)
   workflow_dispatch: # يتيح لك تشغيل السكربت يدوياً بضغطة زر للتجربة
 
 jobs:
