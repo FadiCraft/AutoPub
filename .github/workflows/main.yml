@@ -2,14 +2,14 @@ name: Kiro Auto Bot - TikTok to YouTube
 
 on:
   schedule:
-    - cron: '0 */5 * * *' # يعمل 4 مرات في اليوم (كل 5 ساعات)
-  workflow_dispatch: # يتيح لك تشغيل السكربت يدوياً بضغطة زر للتجربة
+    - cron: '0 */5 * * *' # يعمل كل 5 ساعات
+  workflow_dispatch: # للتشغيل اليدوي
 
 jobs:
   run-automation:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # إذن ضروري لتحديث ملف history.json في المستودع
+      contents: write
 
     steps:
       - name: Checkout Code
@@ -20,10 +20,12 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install System Tools (FFmpeg & yt-dlp)
+      - name: Install System Tools (FFmpeg, Python, & yt-dlp)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg python3-pip
+          # تثبيت المكتبة السحرية لتخطي حماية تيك توك
+          pip3 install curl_cffi 
           sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
           sudo chmod a+rx /usr/local/bin/yt-dlp
 
@@ -38,6 +40,5 @@ jobs:
           git config --global user.name "Kiro Bot"
           git config --global user.email "bot@kirozozo.com"
           git add history.json
-          # [skip ci] تمنع GitHub من إعادة تشغيل نفسه في حلقة مفرغة بعد هذا التحديث
-          git commit -m "Update history.json [skip ci]" || echo "لا يوجد تحديثات جديدة على السجل"
+          git commit -m "Update history.json [skip ci]" || echo "No changes to commit"
           git push
