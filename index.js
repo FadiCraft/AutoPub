@@ -21,7 +21,6 @@ oauth2Client.setCredentials({ refresh_token: CONFIG.youtube.refreshToken });
 const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// دالة بناء الوصف
 function buildSEODescription(title) {
     return `🎬 شاهد أجمل مقاطع الأفلام والمسلسلات الحصرية على قناة ${CONFIG.brandName}.\n` +
            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -33,12 +32,10 @@ function buildSEODescription(title) {
            `#كيرو_زوزو #Shorts #Movies #Trending #أفلام #سينما`;
 }
 
-// دالة توليد الكلمات المفتاحية (Tags)
 function generateTags(title) {
     const basicTags = ['كيرو زوزو', 'Kiro Zozo', 'أفلام', 'مسلسلات', 'Shorts', 'قصص افلام', 'دراما', 'ملخص أفلام'];
-    // تحويل الكلمات الموجودة في العنوان إلى تاجات إضافية (بشرط تكون أكثر من 3 أحرف)
     const titleTags = title.split(' ').filter(word => word.length > 3).slice(0, 5);
-    return [...new Set([...basicTags, ...titleTags])]; // دمج ومنع التكرار
+    return [...new Set([...basicTags, ...titleTags])];
 }
 
 async function startProfessionalAutomation() {
@@ -50,7 +47,8 @@ async function startProfessionalAutomation() {
         console.log(`\n🔎 فحص الحساب: ${account}`);
         
         try {
-            const idsRaw = execSync(`yt-dlp --flat-playlist --get-id "${account}"`, { encoding: 'utf-8' });
+            // إضافة --impersonate chrome هنا لجلب القائمة بنجاح
+            const idsRaw = execSync(`yt-dlp --impersonate chrome --flat-playlist --get-id "${account}"`, { encoding: 'utf-8' });
             let allIds = idsRaw.trim().split('\n').filter(id => id.trim().length > 0);
 
             if (allIds.length === 0) continue;
@@ -61,27 +59,30 @@ async function startProfessionalAutomation() {
             if (nextId) {
                 console.log(`🎯 تم العثور على فيديو مستهدف: ${nextId}`);
                 
-                // 1. التحميل
-                execSync(`yt-dlp -f "bestvideo[height<=1080]+bestaudio/best" -o "input.mp4" "https://www.tiktok.com/@any/video/${nextId}"`);
+                // 1. التحميل مع انتحال شخصية متصفح
+                console.log("📥 جاري التحميل...");
+                execSync(`yt-dlp --impersonate chrome -f "bestvideo[height<=1080]+bestaudio/best" -o "input.mp4" "https://www.tiktok.com/@any/video/${nextId}"`);
                 
                 // 2. المونتاج
                 console.log("🎨 معالجة الفيديو تقنياً...");
                 execSync(`ffmpeg -i input.mp4 -vf "scale=iw*1.1:ih*1.1,crop=iw/1.1:ih/1.1,eq=brightness=0.03:contrast=1.05" -map_metadata -1 -c:v libx264 -crf 20 -c:a aac -y output.mp4`);
 
-                // 3. جلب العنوان
+                // 3. جلب العنوان مع انتحال الشخصية
                 let rawTitle = "فيديو رائع";
-                try { rawTitle = execSync(`yt-dlp --get-title "https://www.tiktok.com/@any/video/${nextId}"`, { encoding: 'utf-8' }).trim(); } catch(e){}
+                try { 
+                    rawTitle = execSync(`yt-dlp --impersonate chrome --get-title "https://www.tiktok.com/@any/video/${nextId}"`, { encoding: 'utf-8' }).trim(); 
+                } catch(e){}
 
-                // 4. الرفع إلى يوتيوب مع الكلمات المفتاحية
-                console.log("📤 جاري الرفع مع الكلمات المفتاحية...");
+                // 4. الرفع إلى يوتيوب
+                console.log("📤 جاري الرفع إلى يوتيوب...");
                 const upload = await youtube.videos.insert({
                     part: 'snippet,status',
                     requestBody: {
                         snippet: {
                             title: `${rawTitle.substring(0, 60)} 🔥 #كيرو_زوزو`,
                             description: buildSEODescription(rawTitle),
-                            tags: generateTags(rawTitle), // تم إضافة الكلمات المفتاحية هنا
-                            categoryId: '24', // Category: Entertainment
+                            tags: generateTags(rawTitle),
+                            categoryId: '24',
                             defaultLanguage: 'ar',
                             defaultAudioLanguage: 'ar'
                         },
@@ -96,11 +97,11 @@ async function startProfessionalAutomation() {
                 const newId = upload.data.id;
                 console.log(`✅ نُشر بنجاح: https://youtu.be/${newId}`);
 
-                // 5. حفظ في السجل
+                // 5. حفظ السجل
                 history.push(nextId);
                 fs.writeFileSync(CONFIG.dbFile, JSON.stringify(history, null, 2));
 
-                // 6. إضافة التعليق
+                // 6. التعليق التلقائي
                 console.log("⏳ انتظار 1 دقيقة للتعليق...");
                 await delay(60000);
                 try {
@@ -116,10 +117,10 @@ async function startProfessionalAutomation() {
                     console.log("💬 تم إضافة التعليق بنجاح.");
                 } catch (err) { console.log("⚠️ تعذر إضافة التعليق."); }
 
-                console.log("🚀 تم إنهاء العملية.");
+                console.log("🚀 تم إنهاء العملية بنجاح.");
                 return; 
             } else {
-                console.log("✅ الحساب مراجع بالكامل.");
+                console.log("✅ الحساب مراجع بالكامل ولا توجد فيديوهات جديدة.");
             }
         } catch (err) {
             console.error(`⚠️ مشكلة في الحساب ${account}:`, err.message);
