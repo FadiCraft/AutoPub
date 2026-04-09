@@ -3,13 +3,13 @@ name: Kiro Auto Bot - TikTok to YouTube
 on:
   schedule:
     - cron: '0 */5 * * *' # يعمل كل 5 ساعات
-  workflow_dispatch: # للتشغيل اليدوي
+  workflow_dispatch: # يتيح لك التشغيل اليدوي للتجربة
 
 jobs:
   run-automation:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # ضروري لتحديث ملف history.json
 
     steps:
       - name: Checkout Code
@@ -20,14 +20,19 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install System Tools (FFmpeg, Python, & yt-dlp)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install System Tools (FFmpeg & yt-dlp)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg python3-pip
-          # تثبيت المكتبة السحرية لتخطي حماية تيك توك
-          pip3 install curl_cffi 
-          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-          sudo chmod a+rx /usr/local/bin/yt-dlp
+          sudo apt-get install -y ffmpeg
+          # تثبيت yt-dlp مع مكتبة التمويه لفك تشفير تيك توك
+          pip install -U yt-dlp curl_cffi
+          # التحقق من أن الميزة تعمل
+          yt-dlp --list-impersonate-targets
 
       - name: Install Node Modules
         run: npm install googleapis
@@ -40,5 +45,6 @@ jobs:
           git config --global user.name "Kiro Bot"
           git config --global user.email "bot@kirozozo.com"
           git add history.json
-          git commit -m "Update history.json [skip ci]" || echo "No changes to commit"
+          # تجنب الخطأ في حال لم يتم العثور على فيديوهات جديدة
+          git commit -m "Update history.json [skip ci]" || echo "لا توجد تحديثات جديدة للسجل"
           git push
